@@ -90,11 +90,14 @@ def predict(hr, resp, spo2, height, weight):
 
     confidence = float(max(pred_proba))
 
+    # predict_proba columns follow model.classes_ order — do not assume [0]=Normal, [1]=Abnormal
+    probabilities = {}
+    for i, class_val in enumerate(model.classes_):
+        name = label_encoder.inverse_transform([class_val])[0]
+        probabilities[name] = float(pred_proba[i])
+
     return {
-        "prediction": pred_label,  # "Normal" or "Abnormal"
+        "prediction": pred_label,
         "confidence": round(confidence, 4),
-        "probabilities": {
-            "Normal": float(pred_proba[0]),
-            "Abnormal": float(pred_proba[1]),
-        },
+        "probabilities": probabilities,
     }
