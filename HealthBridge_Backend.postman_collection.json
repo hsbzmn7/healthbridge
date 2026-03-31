@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "HealthBridge Backend API",
+    "description": "HealthBridge backend endpoints. Use X-Dev-User-Id header when SKIP_FIREBASE=true.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:7000" },
+    { "key": "devUserId", "value": "dev-user-123" }
+  ],
+  "item": [
+    {
+      "name": "Test (no auth)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/test",
+        "description": "Simple test endpoint - no auth required"
+      }
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "GET Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "Required when SKIP_FIREBASE=true" }
+            ],
+            "url": "{{baseUrl}}/api/profile",
+            "description": "Get user profile. Creates one if not exists."
+          }
+        },
+        {
+          "name": "PUT Profile (update)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"John Doe\",\n  \"age\": 30,\n  \"gender\": \"male\",\n  \"height\": 175,\n  \"weight\": 70,\n  \"baseline_heart_rate\": 72,\n  \"baseline_bp_systolic\": 120,\n  \"baseline_bp_diastolic\": 80,\n  \"baseline_spo2\": 98,\n  \"medical_history\": \"No known conditions\",\n  \"medications\": \"None\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profile",
+            "description": "Update profile. All fields optional. BMI auto-calculated from height+weight."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Manual Entry",
+      "item": [
+        {
+          "name": "POST Blood Glucose",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": 95,\n  \"unit\": \"mg/dL\",\n  \"notes\": \"Fasting morning reading\"\n}"
+            },
+            "url": "{{baseUrl}}/api/manual-entry/blood-glucose",
+            "description": "value: required. unit, notes: optional"
+          }
+        },
+        {
+          "name": "GET Blood Glucose",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "url": "{{baseUrl}}/api/manual-entry/blood-glucose?days=30",
+            "description": "days: optional query (default 30)"
+          }
+        },
+        {
+          "name": "POST Blood Pressure",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"systolic\": 118,\n  \"diastolic\": 76,\n  \"notes\": \"Morning reading\"\n}"
+            },
+            "url": "{{baseUrl}}/api/manual-entry/blood-pressure",
+            "description": "systolic, diastolic: required. notes: optional"
+          }
+        },
+        {
+          "name": "GET Blood Pressure",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "url": "{{baseUrl}}/api/manual-entry/blood-pressure?days=30"
+          }
+        },
+        {
+          "name": "POST Doctor Visit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visit_date\": \"2025-03-01\",\n  \"notes\": \"Annual checkup, all good\"\n}"
+            },
+            "url": "{{baseUrl}}/api/manual-entry/doctor-visit",
+            "description": "visit_date: required (YYYY-MM-DD). notes: optional"
+          }
+        },
+        {
+          "name": "GET Doctor Visit",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "url": "{{baseUrl}}/api/manual-entry/doctor-visit?days=365"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "GET Alert History",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "url": "{{baseUrl}}/api/alerts?days=30&limit=50",
+            "description": "days, limit: optional"
+          }
+        },
+        {
+          "name": "POST Evaluate (sustained deviation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heart_rate\": 110,\n  \"spo2\": 92,\n  \"temperature\": 38.5\n}"
+            },
+            "url": "{{baseUrl}}/api/alerts/evaluate",
+            "description": "heart_rate, spo2, temperature: all optional. Checks against baseline."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Sync",
+      "item": [
+        {
+          "name": "POST Health Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Dev-User-Id", "value": "{{devUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"dev-user-123\",\n  \"email\": \"dev@test.com\",\n  \"data\": {\n    \"HeartRate\": [{\n      \"samples\": [{\n        \"beatsPerMinute\": 72,\n        \"time\": \"2025-03-03T10:00:00.000Z\"\n      }]\n    }],\n    \"Weight\": [{\n      \"weight\": { \"inKilograms\": 70 },\n      \"startTime\": \"2025-03-03T10:00:00.000Z\"\n    }],\n    \"BodyTemperature\": [{\n      \"temperature\": { \"inCelsius\": 36.6 },\n      \"time\": \"2025-03-03T10:00:00.000Z\"\n    }]\n  },\n  \"fitbitMetrics\": {\n    \"skinTemperature\": 36.2,\n    \"breathingRate\": 14,\n    \"oxygenSaturation\": 98,\n    \"height\": 175\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/health/sync",
+            "description": "userId must match X-Dev-User-Id. data, fitbitMetrics: structure from app."
+          }
+        }
+      ]
+    }
+  ]
+}

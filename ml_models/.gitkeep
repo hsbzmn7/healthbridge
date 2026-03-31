@@ -1,0 +1,6 @@
+# Put your 4 .pkl files here (download from JupyterHub: /home/zamanmd/Session/model_artifacts.zip):
+# - enhanced_best_model.pkl
+# - enhanced_label_encoder.pkl
+# - enhanced_scaler.pkl
+# - feature_selector.pkl
+# See ML_MODEL_TRAINING_HISTORY.md for training history.

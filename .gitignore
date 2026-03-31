@@ -1,0 +1,35 @@
+# Credentials and secrets - NEVER commit
+**/firebase-service-account.json
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+**/*.pem
+.env
+.env.*
+.env.example
+*.env.local
+
+# Markdown — ignore all except README (so backend can ship a simple README.md)
+*.md
+!README.md
+!**/README.md
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

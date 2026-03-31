@@ -1,0 +1,3 @@
+Initializing the projects with below Libraries ::
+    npm install express mongoose dotenv firebase-admin
+

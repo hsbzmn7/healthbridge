@@ -1,0 +1,5 @@
+# Use Python 3.11 recommended - best compatibility on Windows
+flask>=3.0.0
+numpy>=1.26.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
