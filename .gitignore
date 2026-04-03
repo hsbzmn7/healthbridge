@@ -5,8 +5,9 @@
 **/*.pem
 .env
 .env.*
-.env.example
 *.env.local
+# Allow committing the template (never commit real .env)
+!.env.example
 
 # Markdown — ignore all except README (so backend can ship a simple README.md)
 *.md

@@ -21,6 +21,4 @@ const UserProfileSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-UserProfileSchema.index({ userId: 1 });
-
 module.exports = mongoose.model('UserProfile', UserProfileSchema);

@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const AlertLog = require('../models/AlertLog');
-const { evaluateSustainedDeviation } = require('../utils/baselineLogic');
+const HeartRate = require('../models/HeartRate');
+const { evaluateAndPersistAlerts } = require('../utils/alertEvaluation');
+const { getBaseline } = require('../utils/baselineLogic');
 
 // Get alert history for user
 router.get('/', async (req, res) => {
@@ -24,7 +26,45 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Evaluate current vitals for sustained deviation (called by sync or periodic job)
+// Positive reinforcement when recent vitals look stable (no alerts in window, enough HR data)
+router.get('/wellbeing', async (req, res) => {
+  const { user } = req;
+  if (!user?.uid) return res.status(401).json({ error: 'Unauthorized' });
+
+  const windowDays = Number(req.query.days) || 7;
+  const since = new Date();
+  since.setDate(since.getDate() - windowDays);
+
+  try {
+    const recentAlertCount = await AlertLog.countDocuments({
+      userId: user.uid,
+      timestamp: { $gte: since },
+    });
+    if (recentAlertCount > 0) {
+      return res.json({ message: null });
+    }
+
+    const hrCount = await HeartRate.countDocuments({ userId: user.uid });
+    if (hrCount < 5) {
+      return res.json({ message: null });
+    }
+
+    const baseline = await getBaseline(user.uid);
+    if (!baseline.heart_rate) {
+      return res.json({ message: null });
+    }
+
+    return res.json({
+      message:
+        'Your recent vitals look stable compared to your baseline. Keep up your healthy routines.',
+    });
+  } catch (err) {
+    console.error('Wellbeing summary error:', err);
+    res.status(500).json({ error: 'Failed to load wellbeing summary' });
+  }
+});
+
+// Evaluate current vitals for sustained deviation (manual / cron / client)
 router.post('/evaluate', async (req, res) => {
   const { user } = req;
   if (!user?.uid) return res.status(401).json({ error: 'Unauthorized' });
@@ -32,46 +72,7 @@ router.post('/evaluate', async (req, res) => {
   const { heart_rate, spo2, temperature } = req.body;
 
   try {
-    const results = [];
-    if (heart_rate != null) {
-      const hr = await evaluateSustainedDeviation(user.uid, 'heart_rate', heart_rate);
-      if (hr.shouldAlert) {
-        const alert = await AlertLog.create({
-          userId: user.uid,
-          metric: 'heart_rate',
-          message: hr.message,
-          duration_minutes: hr.durationMinutes,
-          severity: 'medium',
-        });
-        results.push(alert);
-      }
-    }
-    if (spo2 != null) {
-      const sp = await evaluateSustainedDeviation(user.uid, 'spo2', spo2);
-      if (sp.shouldAlert) {
-        const alert = await AlertLog.create({
-          userId: user.uid,
-          metric: 'spo2',
-          message: sp.message,
-          duration_minutes: sp.durationMinutes,
-          severity: 'high',
-        });
-        results.push(alert);
-      }
-    }
-    if (temperature != null) {
-      const temp = await evaluateSustainedDeviation(user.uid, 'temperature', temperature);
-      if (temp.shouldAlert) {
-        const alert = await AlertLog.create({
-          userId: user.uid,
-          metric: 'temperature',
-          message: temp.message,
-          duration_minutes: temp.durationMinutes,
-          severity: 'medium',
-        });
-        results.push(alert);
-      }
-    }
+    const results = await evaluateAndPersistAlerts(user.uid, { heart_rate, spo2, temperature });
     res.json({ evaluated: true, newAlerts: results.length, alerts: results });
   } catch (err) {
     console.error('Alert evaluate error:', err);

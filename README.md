@@ -9,11 +9,24 @@ Node.js API for the HealthBridge app: profiles, manual health entries, alerts, a
 
 ## Setup
 
-1. Create a `.env` file in this folder and set `MONGO_URI` (and `PORT`, `SKIP_FIREBASE`, `ML_SERVICE_URL` as needed). Do not commit `.env`.
-2. `npm install`
-3. `npm start` — server listens on port `7000` by default (`PORT` in `.env`).
+1. Copy **`.env.example`** to **`.env`** and set secrets. **Never commit `.env`** (it is gitignored).
+2. **Production:** `SKIP_FIREBASE=false` and add **`firebase-service-account.json`** from Firebase (gitignored). **Local/Postman without Firebase:** `SKIP_FIREBASE=true` only on dev machines.
+3. `npm install`
+4. `npm start` — listens on **`PORT`** (default **7000**).
 
-Optional Python ML service: see `ml_service/` and mount `ml_models/` with the trained `.pkl` files. Set `ML_SERVICE_URL` in `.env` when the ML service is running.
+Optional: **`CORS_ORIGIN`** — comma-separated allowed origins for web clients; leave unset to allow any origin (common for mobile backends).
+
+Optional Python ML service: see `ml_service/` and `ml_models/` (`.pkl` files). Set **`ML_SERVICE_URL`** to the Flask service URL in production.
+
+**Testing and Postman** (if your clone includes the parent repo): **`docs/TESTING_AND_ML_LOCAL.md`**.
+
+## Deployment checklist
+
+- [ ] `.env` on server with **`MONGO_URI`**, **`SKIP_FIREBASE=false`**, **`firebase-service-account.json`** beside `app.js` (or adjust auth loading).
+- [ ] **`ML_SERVICE_URL`** points to your running ML service (or accept degraded `/model/analyze` if ML is down).
+- [ ] **`CORS_ORIGIN`** set if a browser web app must call this API; React Native often works without it.
+- [ ] Do **not** ship **`SKIP_FIREBASE=true`** on a public production host.
+- [ ] Run **`npm run sanity`** before deploy to verify modules load.
 
 ## Docker
 

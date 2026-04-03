@@ -1,0 +1,177 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-healthbridge-local",
+		"name": "HealthBridge — Local API demo",
+		"description": "**Runbook (single source of truth):** `docs/TESTING_AND_ML_LOCAL.md` at the **repo root** (not inside `release_1_backend` only).\n\n**Quick:** Two processes — Node `npm start` in `release_1_backend` (~7000) and `python app.py` in `ml_service` (~5000). For Postman without Firebase: `SKIP_FIREBASE=true` in `.env` and header `X-Dev-User-Id` (match `userId` in sync body). If ML is down, `/model/analyze` may still respond with `mlServiceAvailable: false`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:7000" },
+		{ "key": "mlUrl", "value": "http://localhost:5000" },
+		{ "key": "devUserId", "value": "dev-user-123" }
+	],
+	"item": [
+		{
+			"name": "01 — Backend health (no auth)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{baseUrl}}/api/test",
+				"description": "Quick check that Node is up. No headers needed."
+			},
+			"response": [
+				{
+					"name": "Example 200",
+					"originalRequest": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/test" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"status\": \"ok\",\n    \"service\": \"healthbridge-api\"\n}"
+				}
+			]
+		},
+		{
+			"name": "02 — ML predict — Normal-style vitals (direct Flask)",
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"hr\": 72,\n  \"resp\": 15,\n  \"spo2\": 97,\n  \"height\": 170,\n  \"weight\": 70\n}"
+				},
+				"url": "{{mlUrl}}/predict",
+				"description": "Calls **Python only** (bypasses Node + Mongo). Body is **tuned to the shipped `.pkl`** so this request returns **`Normal`** (verified with `predict.py`). **SpO₂ 98** often classifies as **Abnormal** with this model (feature bins in `ml_service/predict.py`); use **97** for a stable demo. See `docs/TESTING_AND_ML_LOCAL.md`."
+			},
+			"response": [
+				{
+					"name": "Example — Normal",
+					"originalRequest": { "method": "POST", "url": "{{mlUrl}}/predict" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"confidence\": 0.85,\n    \"prediction\": \"Normal\",\n    \"probabilities\": {\n        \"Normal\": 0.85,\n        \"Abnormal\": 0.15\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "03 — ML predict — Abnormal (direct Flask)",
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"hr\": 125,\n  \"resp\": 28,\n  \"spo2\": 88,\n  \"height\": 170,\n  \"weight\": 95\n}"
+				},
+				"url": "{{mlUrl}}/predict",
+				"description": "Same as server test: often returns **Abnormal** with high confidence. No Mongo required."
+			},
+			"response": [
+				{
+					"name": "Example — Abnormal",
+					"originalRequest": { "method": "POST", "url": "{{mlUrl}}/predict" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"confidence\": 0.8911,\n    \"prediction\": \"Abnormal\",\n    \"probabilities\": {\n        \"Abnormal\": 0.8911,\n        \"Normal\": 0.1089\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "04 — GET /model/analyze (Node + Mongo + ML)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "Requires SKIP_FIREBASE=true" }
+				],
+				"url": "{{baseUrl}}/model/analyze",
+				"description": "Full pipeline: loads **latest** HR/RR/SpO₂ from Mongo for this user → calls ML → adds **curatedExplanation**, **sourceLink**, **sourceLabel**, **disclaimer**.\n\n- If ML is off: `status` may be `Unknown`, `mlServiceAvailable: false`.\n- **Recommendation text**: If `Abnormal` + SpO₂ < 95 → Lung-style copy; Abnormal + HR > 100 → Heart & Stroke; else often **default** Health Canada text.\n\nTo force different stories, use different `devUserId` values **after** inserting matching vitals in Mongo for each user."
+			},
+			"response": [
+				{
+					"name": "Example — Abnormal + default Health Canada text",
+					"originalRequest": { "method": "GET", "url": "{{baseUrl}}/model/analyze" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"status\": \"Abnormal\",\n    \"confidence\": 0.8923,\n    \"vitals\": {\n        \"heartRate\": 75,\n        \"respiratoryRate\": 16,\n        \"spo2\": 98,\n        \"height\": 170,\n        \"weight\": 70\n    },\n    \"curatedExplanation\": \"Monitor your symptoms and consult a healthcare professional for personalized advice.\",\n    \"sourceLink\": \"https://www.canada.ca/en/health-canada.html\",\n    \"sourceLabel\": \"Health Canada\",\n    \"disclaimer\": \"This app does not replace professional medical advice.\",\n    \"mlServiceAvailable\": true\n}"
+				},
+				{
+					"name": "Example — Abnormal + low SpO₂ (Lung Association)",
+					"originalRequest": { "method": "GET", "url": "{{baseUrl}}/model/analyze" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"status\": \"Abnormal\",\n    \"confidence\": 0.88,\n    \"vitals\": {\n        \"heartRate\": 95,\n        \"respiratoryRate\": 22,\n        \"spo2\": 91,\n        \"height\": 170,\n        \"weight\": 75\n    },\n    \"curatedExplanation\": \"Low oxygen saturation may indicate respiratory issues. Ensure adequate rest and consider consulting a healthcare provider.\",\n    \"sourceLink\": \"https://www.lung.ca/\",\n    \"sourceLabel\": \"Canadian Lung Association\",\n    \"disclaimer\": \"This app does not replace professional medical advice.\",\n    \"mlServiceAvailable\": true\n}"
+				},
+				{
+					"name": "Example — Normal",
+					"originalRequest": { "method": "GET", "url": "{{baseUrl}}/model/analyze" },
+					"status": "OK",
+					"code": 200,
+					"header": [],
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"status\": \"Normal\",\n    \"confidence\": 0.82,\n    \"vitals\": {\n        \"heartRate\": 72,\n        \"respiratoryRate\": 16,\n        \"spo2\": 98,\n        \"height\": 170,\n        \"weight\": 70\n    },\n    \"curatedExplanation\": \"Monitor your symptoms and consult a healthcare professional for personalized advice.\",\n    \"sourceLink\": \"https://www.canada.ca/en/health-canada.html\",\n    \"sourceLabel\": \"Health Canada\",\n    \"disclaimer\": \"This app does not replace professional medical advice.\",\n    \"mlServiceAvailable\": true\n}"
+				}
+			]
+		},
+		{
+			"name": "05 — GET /api/alerts/wellbeing",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "SKIP_FIREBASE=true" }
+				],
+				"url": "{{baseUrl}}/api/alerts/wellbeing?days=7",
+				"description": "Positive reinforcement when **no alerts** in the window, **≥5** HR docs, and a computable HR baseline. After **seed:demo**, expect a `message` string. If you have AlertLog rows in the window, `message` is null."
+			}
+		},
+		{
+			"name": "06 — GET /api/alerts (history)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "SKIP_FIREBASE=true" }
+				],
+				"url": "{{baseUrl}}/api/alerts?days=30&limit=20",
+				"description": "Lists stored alerts (sustained deviation, etc.)."
+			}
+		},
+		{
+			"name": "07 — POST /api/alerts/evaluate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" },
+					{ "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "SKIP_FIREBASE=true" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"heart_rate\": 120,\n  \"spo2\": 98,\n  \"temperature\": 36.8\n}"
+				},
+				"url": "{{baseUrl}}/api/alerts/evaluate",
+				"description": "Uses **last N−1** stored readings + body values for sustained check. Run **seed:demo** first so HR has history; otherwise HR may not alert."
+			}
+		},
+		{
+			"name": "08 — POST /api/health/sync (triggers post-sync evaluation)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" },
+					{ "key": "X-Dev-User-Id", "value": "{{devUserId}}", "description": "SKIP_FIREBASE=true" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userId\": \"dev-user-123\",\n  \"data\": {},\n  \"fitbitMetrics\": {}\n}"
+				},
+				"url": "{{baseUrl}}/api/health/sync",
+				"description": "**userId** must match **X-Dev-User-Id**. After **seed:demo**, this runs sustained evaluation on **stored** HR/SpO₂/temp; expect a new HR alert once (2h dedupe). Change `userId` in body if you change **devUserId** variable."
+			}
+		}
+	]
+}

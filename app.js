@@ -15,7 +15,13 @@ const authMiddleware = process.env.SKIP_FIREBASE === 'true'
   : require('./middleware/firebaseAuth');
 
 const app = express();
- app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN;
+if (corsOrigin) {
+  const origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+  app.use(cors({ origin: origins.length === 1 ? origins[0] : origins }));
+} else {
+  app.use(cors());
+}
 app.use(express.json({limit: '50mb'}));
 
 const PORT = process.env.PORT || 7000;
@@ -31,13 +37,8 @@ app.use('/api/manual-entry', authMiddleware, manualEntryRoutes);
 app.use('/api/alerts', authMiddleware, alertsRoutes);
 app.use('/model', authMiddleware, modelRoutes);
 
-app.get('/api/test', async (req, res)=> {
-try {
-    const products = {"Response":"This is a temp"};
-    res.json(products); // Send the products as JSON response
-} catch (error) {
-    res.status(500).send('Internal Server Error');
-}
-})
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'ok', service: 'healthbridge-api' });
+});
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

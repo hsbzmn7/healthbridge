@@ -54,7 +54,8 @@ async function callMLService(hr, resp, spo2, height, weight) {
 // GET /model/analyze - frontend AI Insights calls this
 router.get('/analyze', async (req, res) => {
   const { user } = req;
-  const userId = user?.uid || req.headers['x-dev-user-id'];
+  // Auth middleware always sets req.user (Firebase or devAuth). Do not trust X-Dev-User-Id when Firebase is enabled.
+  const userId = user?.uid;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

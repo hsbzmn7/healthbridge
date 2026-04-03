@@ -1,7 +1,9 @@
 {
    "main": "app.js",
    "scripts": {
-      "start": "node app.js"
+      "start": "node app.js",
+      "sanity": "node scripts/sanity-modules.js",
+      "seed:demo": "node scripts/seedDemoVitals.js"
    },
    "dependencies": {
       "cors": "^2.8.5",
