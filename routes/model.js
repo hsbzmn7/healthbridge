@@ -105,6 +105,13 @@ router.get('/analyze', async (req, res) => {
       disclaimer: recommendation.disclaimer,
       mlServiceAvailable: !mlError,
       ...(mlError && { mlError }),
+      ...(prediction?.rawModelPrediction != null && {
+        rawModelPrediction: prediction.rawModelPrediction,
+      }),
+      ...(prediction?.calibrationNote && { calibrationNote: prediction.calibrationNote }),
+      ...(typeof prediction?.vitalsInTypicalRanges === 'boolean' && {
+        vitalsInTypicalRanges: prediction.vitalsInTypicalRanges,
+      }),
     };
 
     res.json(result);

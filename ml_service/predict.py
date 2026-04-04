@@ -2,10 +2,18 @@
 Feature engineering and prediction logic - must match Session 2 notebook exactly.
 Input: HR, RESP, SpO2, Height, Weight
 Output: Normal or Abnormal
+
+Calibration: the Session 2 classifier can be biased toward "Abnormal" on healthy vitals with
+moderate confidence (~0.55–0.65). When readings are in typical ranges AND the model is not
+highly confident in Abnormal, we report Normal (see apply_calibration).
 """
 import os
 import numpy as np
 from pathlib import Path
+
+# Max probability below which we treat the model as "uncertain" for calibration
+_UNCERTAIN_MAX_PROBA = float(os.environ.get("ML_UNCERTAIN_THRESHOLD", "0.72"))
+# Typical consumer vitals — not diagnostic; used only to de-bias misfires
 
 # Path to model files - use env var for Docker, else sibling ml_models folder
 MODELS_DIR = Path(os.environ.get("MODELS_PATH", str(Path(__file__).parent.parent / "ml_models")))
@@ -62,6 +70,54 @@ def create_features(hr, resp, spo2, height, weight):
     return np.array([features])
 
 
+def _clinical_typical_ranges(hr, resp, spo2, height, weight):
+    """True if vitals look like a healthy adult snapshot (wearable context)."""
+    try:
+        hr = float(hr)
+        resp = float(resp)
+        spo2 = float(spo2)
+        h = float(height)
+        w = float(weight)
+    except (TypeError, ValueError):
+        return False
+    if h <= 0 or w <= 0 or spo2 <= 0:
+        return False
+    bmi = w / ((h / 100) ** 2)
+    return (
+        55 <= hr <= 105
+        and 10 <= resp <= 24
+        and 94 <= spo2 <= 100
+        and 17.0 <= bmi <= 32.0
+    )
+
+
+def apply_calibration(pred_label, probabilities, confidence, hr, resp, spo2, height, weight):
+    """
+    If model says Abnormal but max class prob is low and vitals are in typical ranges,
+    report Normal to reduce false alarms from class imbalance / threshold effects.
+    """
+    note = None
+    if pred_label != "Abnormal":
+        return pred_label, note
+    if not _clinical_typical_ranges(hr, resp, spo2, height, weight):
+        return pred_label, note
+
+    p_normal = float(probabilities.get("Normal", 0.0))
+    p_abnormal = float(probabilities.get("Abnormal", 0.0))
+
+    # Uncertain winner OR Normal probability is competitive
+    uncertain = confidence < _UNCERTAIN_MAX_PROBA
+    competitive = p_normal >= 0.32 and (p_abnormal - p_normal) < 0.35
+
+    if uncertain or competitive:
+        return "Normal", (
+            "Adjusted from screening model output: vitals were in typical ranges and "
+            "the model was not highly confident (demo calibration)."
+        )
+
+    return pred_label, note
+
+
 def predict(hr, resp, spo2, height, weight):
     """
     Load models and predict. Returns dict with prediction, confidence, etc.
@@ -86,7 +142,7 @@ def predict(hr, resp, spo2, height, weight):
 
     pred_proba = model.predict_proba(X_selected)[0]
     pred_idx = model.predict(X_selected)[0]
-    pred_label = label_encoder.inverse_transform([pred_idx])[0]
+    raw_label = label_encoder.inverse_transform([pred_idx])[0]
 
     confidence = float(max(pred_proba))
 
@@ -96,8 +152,21 @@ def predict(hr, resp, spo2, height, weight):
         name = label_encoder.inverse_transform([class_val])[0]
         probabilities[name] = float(pred_proba[i])
 
-    return {
+    pred_label, cal_note = apply_calibration(
+        raw_label, probabilities, confidence, hr, resp, spo2, height, weight
+    )
+    if pred_label != raw_label:
+        # Recompute confidence as max prob under final label for display consistency
+        confidence = float(probabilities.get(pred_label, confidence))
+
+    vitals_typical = _clinical_typical_ranges(hr, resp, spo2, height, weight)
+    out = {
         "prediction": pred_label,
+        "rawModelPrediction": raw_label,
         "confidence": round(confidence, 4),
         "probabilities": probabilities,
+        "vitalsInTypicalRanges": vitals_typical,
     }
+    if cal_note:
+        out["calibrationNote"] = cal_note
+    return out

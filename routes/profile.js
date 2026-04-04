@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const UserProfile = require('../models/UserProfile');
+const { validateDobString, enrichProfileResponse } = require('../utils/ageFromDob');
+
+const ALLOWED_AVATAR_IDS = new Set(['0', '1', '2', '3', '4', '5', '6', '7']);
 
 // Get or create user profile
 router.get('/', async (req, res) => {
@@ -18,7 +21,7 @@ router.get('/', async (req, res) => {
         displayName: user.name || req.query.displayName,
       });
     }
-    res.json(profile);
+    res.json(enrichProfileResponse(profile));
   } catch (err) {
     console.error('Profile fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch profile' });
@@ -35,6 +38,7 @@ router.put('/', async (req, res) => {
   const {
     displayName,
     age,
+    dateOfBirth,
     gender,
     height,
     weight,
@@ -44,6 +48,7 @@ router.put('/', async (req, res) => {
     baseline_spo2,
     medical_history,
     medications,
+    avatarId,
   } = req.body;
 
   try {
@@ -52,7 +57,6 @@ router.put('/', async (req, res) => {
     const updateData = {
       updatedAt: new Date(),
       ...(displayName !== undefined && { displayName }),
-      ...(age !== undefined && { age: age === '' ? null : Number(age) }),
       ...(gender !== undefined && { gender: gender === '' ? null : gender }),
       ...(height !== undefined && { height: height === '' ? null : Number(height) }),
       ...(weight !== undefined && { weight: weight === '' ? null : Number(weight) }),
@@ -63,6 +67,29 @@ router.put('/', async (req, res) => {
       ...(medical_history !== undefined && { medical_history: medical_history === '' ? null : medical_history }),
       ...(medications !== undefined && { medications: medications === '' ? null : medications }),
     };
+
+    if (avatarId !== undefined) {
+      if (avatarId === '' || avatarId === null) {
+        updateData.avatarId = null;
+      } else {
+        const id = String(avatarId);
+        if (!ALLOWED_AVATAR_IDS.has(id)) {
+          return res.status(400).json({ error: 'Invalid avatarId' });
+        }
+        updateData.avatarId = id;
+      }
+    }
+
+    if (dateOfBirth !== undefined) {
+      const v = validateDobString(dateOfBirth);
+      if (!v.ok) {
+        return res.status(400).json({ error: v.error });
+      }
+      updateData.dateOfBirth = v.normalized;
+      updateData.age = null;
+    } else if (age !== undefined) {
+      updateData.age = age === '' || age === null ? null : Number(age);
+    }
 
     // Auto-calculate BMI when height and weight are provided
     if (updateData.height && updateData.weight) {
@@ -88,7 +115,7 @@ router.put('/', async (req, res) => {
       profile = await UserProfile.findOne({ userId: user.uid });
     }
 
-    res.json(profile);
+    res.json(enrichProfileResponse(profile));
   } catch (err) {
     console.error('Profile update error:', err);
     res.status(500).json({ error: 'Failed to update profile' });

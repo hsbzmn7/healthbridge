@@ -4,8 +4,13 @@ const UserProfileSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
   email: String,
   displayName: String,
+  /** Preset avatar index as string "0".."7" (emoji set on client); null = default */
+  avatarId: { type: String, default: null },
   // Onboarding fields (all optional)
+  /** @deprecated use dateOfBirth; still returned as computed `age` when DOB is set */
   age: { type: Number, default: null },
+  /** ISO date string YYYY-MM-DD */
+  dateOfBirth: { type: String, default: null },
   gender: { type: String, default: null }, // male, female, other, prefer_not_to_say
   height: { type: Number, default: null }, // cm
   weight: { type: Number, default: null }, // kg

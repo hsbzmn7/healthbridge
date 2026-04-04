@@ -3,7 +3,10 @@
    "scripts": {
       "start": "node app.js",
       "sanity": "node scripts/sanity-modules.js",
-      "seed:demo": "node scripts/seedDemoVitals.js"
+      "seed:demo": "node scripts/seedDemoVitals.js",
+      "seed:demo-full": "node scripts/seedDemoUserFull.js",
+      "seed:ml-persona": "node scripts/seedMlPersonaUser.js",
+      "create:ml-firebase-users": "node scripts/createMlDemoFirebaseUsers.js"
    },
    "dependencies": {
       "cors": "^2.8.5",
