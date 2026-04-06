@@ -83,6 +83,10 @@ router.get('/analyze', async (req, res) => {
     const vitals = await getLatestVitals(userId);
 
     if (!vitals.sufficientData) {
+      console.info(
+        '[model/analyze] InsufficientData',
+        JSON.stringify({ userId, missingFields: vitals.missingFields })
+      );
       const recommendation = getRecommendationForCondition('insufficient_data');
       return res.json({
         status: 'InsufficientData',
