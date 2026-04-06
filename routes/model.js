@@ -14,6 +14,15 @@ const { getRecommendationForCondition, appendToAIOutput } = require('../utils/re
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
 
+function isPositiveNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Loads latest vitals from Mongo. Does not invent defaults — the ML model is only
+ * called when all five inputs exist (avoids misleading Normal/Abnormal from placeholders).
+ */
 async function getLatestVitals(userId) {
   const [hr, spo2, resp, profile, heightDoc, weightDoc] = await Promise.all([
     HeartRate.findOne({ userId }).sort({ timestamp: -1 }).lean(),
@@ -24,16 +33,26 @@ async function getLatestVitals(userId) {
     Weight.findOne({ userId }).sort({ timestamp: -1 }).lean(),
   ]);
 
-  const height = heightDoc?.value ?? profile?.height ?? 170;
-  const weight = weightDoc?.value ?? profile?.weight ?? 70;
+  const height = heightDoc?.value ?? profile?.height ?? null;
+  const weight = weightDoc?.value ?? profile?.weight ?? null;
+
+  const missingFields = [];
+  if (!hr || !isPositiveNumber(hr.value)) missingFields.push('heartRate');
+  if (!spo2 || !isPositiveNumber(spo2.value)) missingFields.push('oxygenSaturation');
+  if (!resp || !isPositiveNumber(resp.value)) missingFields.push('breathingRate');
+  if (!isPositiveNumber(height)) missingFields.push('height');
+  if (!isPositiveNumber(weight)) missingFields.push('weight');
+
+  const sufficientData = missingFields.length === 0;
 
   return {
-    hr: hr?.value ?? 75,
-    resp: resp?.value ?? 16,
-    spo2: spo2?.value ?? 98,
-    height,
-    weight,
-    hasData: !!(hr && spo2 && resp),
+    hr: hr?.value != null ? Number(hr.value) : null,
+    resp: resp?.value != null ? Number(resp.value) : null,
+    spo2: spo2?.value != null ? Number(spo2.value) : null,
+    height: height != null ? Number(height) : null,
+    weight: weight != null ? Number(weight) : null,
+    sufficientData,
+    missingFields,
   };
 }
 
@@ -63,14 +82,36 @@ router.get('/analyze', async (req, res) => {
   try {
     const vitals = await getLatestVitals(userId);
 
+    if (!vitals.sufficientData) {
+      const recommendation = getRecommendationForCondition('insufficient_data');
+      return res.json({
+        status: 'InsufficientData',
+        confidence: null,
+        sufficientData: false,
+        missingFields: vitals.missingFields,
+        vitals: {
+          heartRate: vitals.hr,
+          respiratoryRate: vitals.resp,
+          spo2: vitals.spo2,
+          height: vitals.height,
+          weight: vitals.weight,
+        },
+        curatedExplanation: recommendation.explanation,
+        sourceLink: recommendation.source,
+        sourceLabel: recommendation.sourceLabel,
+        disclaimer: recommendation.disclaimer,
+        mlServiceAvailable: false,
+      });
+    }
+
     let prediction = null;
     let mlError = null;
 
     try {
       prediction = await callMLService(
-          vitals.hr,
-          vitals.resp,
-          vitals.spo2,
+        vitals.hr,
+        vitals.resp,
+        vitals.spo2,
         vitals.height,
         vitals.weight
       );
@@ -92,6 +133,7 @@ router.get('/analyze', async (req, res) => {
     const result = {
       status: prediction?.prediction || 'Unknown',
       confidence: prediction?.confidence ?? null,
+      sufficientData: true,
       vitals: {
         heartRate: vitals.hr,
         respiratoryRate: vitals.resp,

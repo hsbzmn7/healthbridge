@@ -45,6 +45,12 @@ const CONDITION_MAPPING = {
     source: 'https://www.canada.ca/en/health-canada.html',
     sourceLabel: 'Health Canada',
   },
+  insufficient_data: {
+    explanation:
+      'We do not have enough recent health data to run the AI screening. Connect Fitbit or Health Connect, open the app so data can sync, and add height and weight in your profile if they are missing. The model needs heart rate, oxygen saturation, breathing rate, height, and weight.',
+    source: 'https://www.canada.ca/en/health-canada.html',
+    sourceLabel: 'Health Canada',
+  },
 };
 
 const DISCLAIMER = 'This app does not replace professional medical advice.';
