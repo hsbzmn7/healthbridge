@@ -10,6 +10,13 @@ const FitbitBreathingRate = require('../models/BreathingRate');
 const FitBitHeight = require('../models/Height');
 const Height = require('../models/Height');
 
+/** Health Connect uses startTime/endTime; Postman samples use `time`. */
+function recordTimestamp(entry) {
+  const raw = entry?.time ?? entry?.startTime ?? entry?.endTime;
+  const d = raw != null ? new Date(raw) : new Date();
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 async function saveHealthMetrics(userId, data, fitbitMetrics) {
   console.log("Fitbit metrics are:");
   console.log(fitbitMetrics);
@@ -70,14 +77,19 @@ async function saveHealthMetrics(userId, data, fitbitMetrics) {
   // BodyTemperature
   if (Array.isArray(data.BodyTemperature)) {
     for (const entry of data.BodyTemperature) {
-      console.log(`Body Temperature is: `+entry.temperature.inCelsius);
+      const ts = recordTimestamp(entry);
+      if (!ts) {
+        console.warn('Skipping BodyTemperature entry with no valid time field:', entry);
+        continue;
+      }
+      console.log(`Body Temperature is: ` + entry.temperature?.inCelsius);
       await insertIfNew(
         BodyTemperature,
-        { userId, timestamp: new Date(entry.time) },
+        { userId, timestamp: ts },
         {
           userId,
           value: entry.temperature.inCelsius,
-          timestamp: new Date(entry.time),
+          timestamp: ts,
         }
       );
     }
