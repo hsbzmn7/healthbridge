@@ -7,6 +7,7 @@ const profileRoutes = require('./routes/profile');
 const manualEntryRoutes = require('./routes/manualEntry');
 const alertsRoutes = require('./routes/alerts');
 const modelRoutes = require('./routes/model');
+const appointmentsRoutes = require('./routes/appointments');
 const devAuth = require('./middleware/devAuth');
 
 // Use dev auth when SKIP_FIREBASE=true (no firebase-service-account.json needed)
@@ -34,6 +35,7 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/health', authMiddleware, healthRoutes);
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/manual-entry', authMiddleware, manualEntryRoutes);
+app.use('/api/appointments', authMiddleware, appointmentsRoutes);
 app.use('/api/alerts', authMiddleware, alertsRoutes);
 app.use('/model', authMiddleware, modelRoutes);
 

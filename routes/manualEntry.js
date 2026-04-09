@@ -119,14 +119,16 @@ router.get('/doctor-visit', async (req, res) => {
   const { user } = req;
   if (!user?.uid) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { days = 365 } = req.query;
+  const { days = 365, limit = 100 } = req.query;
+  const dayNum = Math.min(Math.max(Number(days) || 365, 1), 36500);
+  const lim = Math.min(Math.max(Number(limit) || 100, 1), 500);
   const since = new Date();
-  since.setDate(since.getDate() - Number(days));
+  since.setDate(since.getDate() - dayNum);
 
   try {
     const visits = await DoctorVisit.find({ userId: user.uid, visit_date: { $gte: since } })
       .sort({ visit_date: -1 })
-      .limit(50)
+      .limit(lim)
       .lean();
     res.json(visits);
   } catch (err) {
