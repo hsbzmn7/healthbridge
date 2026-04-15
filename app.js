@@ -8,6 +8,7 @@ const manualEntryRoutes = require('./routes/manualEntry');
 const alertsRoutes = require('./routes/alerts');
 const modelRoutes = require('./routes/model');
 const appointmentsRoutes = require('./routes/appointments');
+const gentleAiNoteRoutes = require('./routes/gentleAiNote');
 const devAuth = require('./middleware/devAuth');
 
 // Use dev auth when SKIP_FIREBASE=true (no firebase-service-account.json needed)
@@ -37,6 +38,7 @@ app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/manual-entry', authMiddleware, manualEntryRoutes);
 app.use('/api/appointments', authMiddleware, appointmentsRoutes);
 app.use('/api/alerts', authMiddleware, alertsRoutes);
+app.use('/api/ai/gentle-note', authMiddleware, gentleAiNoteRoutes);
 app.use('/model', authMiddleware, modelRoutes);
 
 app.get('/api/test', (req, res) => {

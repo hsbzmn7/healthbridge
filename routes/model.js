@@ -4,57 +4,10 @@
  */
 const express = require('express');
 const router = express.Router();
-const HeartRate = require('../models/HeartRate');
-const OxygenSaturation = require('../models/OxygenSaturation');
-const BreathingRate = require('../models/BreathingRate');
-const UserProfile = require('../models/UserProfile');
-const Height = require('../models/Height');
-const Weight = require('../models/Weight');
-const { getRecommendationForCondition, appendToAIOutput } = require('../utils/recommendationMapping');
+const { getRecommendationForCondition } = require('../utils/recommendationMapping');
+const { getLatestScreeningVitals } = require('../utils/latestScreeningVitals');
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
-
-function isPositiveNumber(v) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0;
-}
-
-/**
- * Loads latest vitals from Mongo. Does not invent defaults — the ML model is only
- * called when all five inputs exist (avoids misleading Normal/Abnormal from placeholders).
- */
-async function getLatestVitals(userId) {
-  const [hr, spo2, resp, profile, heightDoc, weightDoc] = await Promise.all([
-    HeartRate.findOne({ userId }).sort({ timestamp: -1 }).lean(),
-    OxygenSaturation.findOne({ userId }).sort({ timestamp: -1 }).lean(),
-    BreathingRate.findOne({ userId }).sort({ timestamp: -1 }).lean(),
-    UserProfile.findOne({ userId }).lean(),
-    Height.findOne({ userId }).sort({ timestamp: -1 }).lean(),
-    Weight.findOne({ userId }).sort({ timestamp: -1 }).lean(),
-  ]);
-
-  const height = heightDoc?.value ?? profile?.height ?? null;
-  const weight = weightDoc?.value ?? profile?.weight ?? null;
-
-  const missingFields = [];
-  if (!hr || !isPositiveNumber(hr.value)) missingFields.push('heartRate');
-  if (!spo2 || !isPositiveNumber(spo2.value)) missingFields.push('oxygenSaturation');
-  if (!resp || !isPositiveNumber(resp.value)) missingFields.push('breathingRate');
-  if (!isPositiveNumber(height)) missingFields.push('height');
-  if (!isPositiveNumber(weight)) missingFields.push('weight');
-
-  const sufficientData = missingFields.length === 0;
-
-  return {
-    hr: hr?.value != null ? Number(hr.value) : null,
-    resp: resp?.value != null ? Number(resp.value) : null,
-    spo2: spo2?.value != null ? Number(spo2.value) : null,
-    height: height != null ? Number(height) : null,
-    weight: weight != null ? Number(weight) : null,
-    sufficientData,
-    missingFields,
-  };
-}
 
 async function callMLService(hr, resp, spo2, height, weight) {
   const url = `${ML_SERVICE_URL}/predict`;
@@ -80,7 +33,7 @@ router.get('/analyze', async (req, res) => {
   }
 
   try {
-    const vitals = await getLatestVitals(userId);
+    const vitals = await getLatestScreeningVitals(userId);
 
     if (!vitals.sufficientData) {
       console.info(
